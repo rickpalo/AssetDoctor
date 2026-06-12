@@ -10,6 +10,9 @@ venv/
 dist/
 *.zip
 
+# Local staging dir for the GitHub Pages extension repo (published to gh-pages branch)
+.pages/
+
 # Bundled wheels are committed deliberately once pinned; ignore stray downloads
 wheels/*.whl.tmp
 
