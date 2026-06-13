@@ -107,10 +107,22 @@ def test_type_code_for():
         fb.type_code_for("notatype")
 
 
-def test_parse_args():
-    assert fb._parse_args(["-h"]) is None
-    assert fb._parse_args(["dir"]) == (["dir"], None, False)
-    assert fb._parse_args(["dir", "tree", "--type", "mesh", "--first"]) == (
-        ["dir", "tree"], "mesh", True)
-    assert fb._parse_args(["dir", "*cam*", "--type=camera"]) == (
-        ["dir", "*cam*"], "camera", False)
+def test_parser_parses_args():
+    p = fb.build_parser()
+    ns = p.parse_args(["dir", "tree", "--type", "mesh", "--first"])
+    assert (ns.directory, ns.phrase, ns.obj_type, ns.first) == ("dir", "tree", "mesh", True)
+    ns2 = p.parse_args(["dir", "*cam*", "--type=camera"])
+    assert (ns2.obj_type, ns2.first) == ("camera", False)
+
+
+def test_parser_help_exits_zero():
+    with pytest.raises(SystemExit) as exc:
+        fb.build_parser().parse_args(["--help"])
+    assert exc.value.code == 0
+
+
+def test_parser_rejects_unknown_type_and_missing_phrase():
+    with pytest.raises(SystemExit):
+        fb.build_parser().parse_args(["dir", "x", "--type", "bogus"])  # bad choice
+    with pytest.raises(SystemExit):
+        fb.build_parser().parse_args(["dir"])  # phrase is required

@@ -10,15 +10,9 @@ Matching:
   * a phrase containing wildcards (* ? [ ]) matches as a case-insensitive GLOB
     ("tree*", "*billboard*", "chair_??").
 
-Usage:
-    python tools/find_objects.py <directory> <phrase> [--type TYPE] [--first]
-
-    phrase    name to search for (quote wildcards).
-    --type    restrict to an object type (default: any). One of:
-              empty, mesh, curve, surface, text, metaball, lamp/light, camera,
-              speaker, lightprobe, lattice, armature, grease_pencil,
-              curves/hair, pointcloud, volume.
-    --first   stop at the first match (the newest file, since scan is newest-first).
+Object types for --type: empty, mesh, curve, surface, text, metaball, lamp/light,
+camera, speaker, lightprobe, lattice, armature, grease_pencil, curves/hair,
+pointcloud, volume (default: any).
 
 Examples:
     python tools/find_objects.py "E:/BlenderSync" billboard
@@ -136,49 +130,42 @@ def find_mesh_objects(blend: pathlib.Path, keyword: str) -> list[str]:
     return find_objects(blend, keyword, obj_type="mesh")
 
 
-def _parse_args(argv: list[str]):
-    """Return (positional, obj_type, stop_first), or None to request help."""
-    positional: list[str] = []
-    obj_type: str | None = None
-    stop_first = False
-    i = 0
-    while i < len(argv):
-        a = argv[i]
-        if a in ("-h", "--help"):
-            return None
-        elif a in ("--first", "-1"):
-            stop_first = True
-        elif a == "--all":
-            stop_first = False
-        elif a.startswith("--type="):
-            obj_type = a.split("=", 1)[1]
-        elif a in ("--type", "-t"):
-            i += 1
-            obj_type = argv[i] if i < len(argv) else None
-        elif a.startswith("-"):
-            pass  # ignore unknown flags
-        else:
-            positional.append(a)
-        i += 1
-    return positional, obj_type, stop_first
+def build_parser() -> "argparse.ArgumentParser":
+    """The argparse CLI parser (also gives `-h/--help` for free)."""
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="find_objects.py",
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("directory", help="folder to scan recursively for .blend files")
+    parser.add_argument(
+        "phrase",
+        help="name to search for; plain text = case-insensitive substring, "
+        "or use wildcards (* ? [ ]) for a glob match",
+    )
+    parser.add_argument(
+        "--type", "-t", dest="obj_type", metavar="TYPE", default=None,
+        choices=sorted(TYPE_CODES) + ["any"],
+        help="restrict to an object type (default: any)",
+    )
+    parser.add_argument(
+        "--first", "-1", action="store_true",
+        help="stop at the first (newest) match instead of listing all",
+    )
+    return parser
 
 
 def main(argv: list[str]) -> int:
-    parsed = _parse_args(argv)
-    if parsed is None or len(parsed[0]) < 2:
-        print(__doc__)
-        return 2
-    positional, obj_type, stop_first = parsed
+    args = build_parser().parse_args(argv)  # handles -h/--help and bad input
+    root = pathlib.Path(args.directory)
+    phrase = args.phrase
+    obj_type = args.obj_type
+    stop_first = args.first
 
-    root = pathlib.Path(positional[0])
-    phrase = positional[1]
     if not root.is_dir():
         print(f"Not a directory: {root}")
-        return 2
-    try:
-        type_code_for(obj_type)  # validate early
-    except ValueError as exc:
-        print(f"Error: {exc}")
         return 2
 
     _ensure_bat_importable()
