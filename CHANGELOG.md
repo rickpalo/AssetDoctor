@@ -107,6 +107,13 @@ flagged as major.
 - 60 pytest tests pass. In Blender 5.1: a 1K+2K material pair clusters, the 2K wins canonical,
   Apply removes the 1K and repoints its object's slot to the 2K; whitelist override works.
 
+## Unreleased — auto-update repository
+
+- Published a self-hosted **extension repository** so Blender auto-updates: `gh-pages` branch
+  serves `index.json` (from `extension server-generate`) + the version zips via GitHub Pages at
+  **https://rickpalo.github.io/AssetDoctor/index.json**. Users add that URL once
+  (Preferences → Get Extensions → Repositories). See `docs/RELEASING.md`.
+
 ## [0.1.5] — M7 step 4: Profile Render (real peak RAM)
 
 ### Added
