@@ -1,4 +1,4 @@
-"""Tests for tools/find_billboards.py.
+"""Tests for tools/find_objects.py.
 
 The module lives in tools/ (a standalone utility, not the importable package), so
 it is loaded by file path. conftest already puts the BAT wheel on sys.path, which
@@ -16,8 +16,8 @@ LINKPROJ = REPO_ROOT / "tests" / "fixtures" / "linkproj"
 
 
 def _load_module():
-    path = REPO_ROOT / "tools" / "find_billboards.py"
-    spec = importlib.util.spec_from_file_location("find_billboards", path)
+    path = REPO_ROOT / "tools" / "find_objects.py"
+    spec = importlib.util.spec_from_file_location("find_objects", path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod

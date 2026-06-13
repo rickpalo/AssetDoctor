@@ -11,9 +11,9 @@ Matching:
     ("tree*", "*billboard*", "chair_??").
 
 Usage:
-    python tools/find_billboards.py <directory> [phrase] [--type TYPE] [--first]
+    python tools/find_objects.py <directory> <phrase> [--type TYPE] [--first]
 
-    phrase    name to search for (default: "billboard"). Quote wildcards.
+    phrase    name to search for (quote wildcards).
     --type    restrict to an object type (default: any). One of:
               empty, mesh, curve, surface, text, metaball, lamp/light, camera,
               speaker, lightprobe, lattice, armature, grease_pencil,
@@ -21,9 +21,9 @@ Usage:
     --first   stop at the first match (the newest file, since scan is newest-first).
 
 Examples:
-    python tools/find_billboards.py "E:/BlenderSync" billboard
-    python tools/find_billboards.py "E:/assets" "tree*" --type mesh
-    python tools/find_billboards.py "E:/assets" "*cam*" --type camera --first
+    python tools/find_objects.py "E:/BlenderSync" billboard
+    python tools/find_objects.py "E:/assets" "tree*" --type mesh
+    python tools/find_objects.py "E:/assets" "*cam*" --type camera --first
 """
 
 from __future__ import annotations
@@ -165,13 +165,13 @@ def _parse_args(argv: list[str]):
 
 def main(argv: list[str]) -> int:
     parsed = _parse_args(argv)
-    if parsed is None or not parsed[0]:
+    if parsed is None or len(parsed[0]) < 2:
         print(__doc__)
         return 2
     positional, obj_type, stop_first = parsed
 
     root = pathlib.Path(positional[0])
-    phrase = positional[1] if len(positional) > 1 else "billboard"
+    phrase = positional[1]
     if not root.is_dir():
         print(f"Not a directory: {root}")
         return 2
