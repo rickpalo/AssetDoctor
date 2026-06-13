@@ -1,27 +1,46 @@
-"""Find mesh objects whose name contains a keyword (default: "billboard").
+"""Find objects across .blend files by name phrase, optional type, offline.
 
 Scans every ``*.blend`` under a directory, newest file first, reading each one
 OFFLINE via Blender Asset Tracer (BAT) -- no Blender launch needed. Objects live
 in the DNA as ``OB`` blocks; the name is ``id.name`` (with a 2-char "OB" prefix)
-and ``type == 1`` (OB_MESH) marks a mesh.
+and the ``type`` field encodes the object kind (mesh, curve, camera, ...).
+
+Matching:
+  * a plain phrase matches as a case-insensitive SUBSTRING ("tree" -> "Treetop");
+  * a phrase containing wildcards (* ? [ ]) matches as a case-insensitive GLOB
+    ("tree*", "*billboard*", "chair_??").
 
 Usage:
-    python tools/find_billboards.py <directory> [keyword]
-    python tools/find_billboards.py <directory> [keyword] --first   # stop at first hit
+    python tools/find_billboards.py <directory> [phrase] [--type TYPE] [--first]
+
+    phrase    name to search for (default: "billboard"). Quote wildcards.
+    --type    restrict to an object type (default: any). One of:
+              empty, mesh, curve, surface, text, metaball, lamp/light, camera,
+              speaker, lightprobe, lattice, armature, grease_pencil,
+              curves/hair, pointcloud, volume.
+    --first   stop at the first match (the newest file, since scan is newest-first).
 
 Examples:
-    python tools/find_billboards.py "E:/BlenderSync/SynologyDrive"
-    python tools/find_billboards.py "E:/assets" tree --first
+    python tools/find_billboards.py "E:/BlenderSync" billboard
+    python tools/find_billboards.py "E:/assets" "tree*" --type mesh
+    python tools/find_billboards.py "E:/assets" "*cam*" --type camera --first
 """
 
 from __future__ import annotations
 
+import fnmatch
 import glob
 import pathlib
 import sys
 
-OB_MESH = 1  # Blender DNA object type for a mesh (object.type field)
-
+# Friendly object-type name -> Blender DNA object 'type' code (DNA_object_types.h).
+TYPE_CODES = {
+    "empty": 0, "mesh": 1, "curve": 2, "surface": 3, "text": 4, "metaball": 5,
+    "lamp": 10, "light": 10, "camera": 11, "speaker": 12, "lightprobe": 13,
+    "lattice": 22, "armature": 25, "grease_pencil": 26, "curves": 27, "hair": 27,
+    "pointcloud": 28, "volume": 29,
+}
+_ANY_TYPE = {"", "any", "all", "*"}
 
 ZSTD_HINT = (
     "Blender 3.0+ saves compressed .blend files with ZStandard, which needs the\n"
@@ -45,7 +64,6 @@ def _ensure_bat_importable() -> None:
 
 
 def _zstandard_available() -> bool:
-    """Whether the `zstandard` module is importable (needed for compressed files)."""
     try:
         import zstandard  # noqa: F401
 
@@ -57,6 +75,26 @@ def _zstandard_available() -> bool:
 def _is_zstd_error(exc: Exception) -> bool:
     """True when a per-file read failed only because zstandard is missing."""
     return "zstandard" in str(exc).lower()
+
+
+def type_code_for(obj_type: str | None) -> int | None:
+    """Resolve a friendly type name to its DNA code, or None for 'any'."""
+    if obj_type is None or obj_type.lower() in _ANY_TYPE:
+        return None
+    try:
+        return TYPE_CODES[obj_type.lower()]
+    except KeyError:
+        raise ValueError(
+            f"unknown object type {obj_type!r}; known: {', '.join(sorted(TYPE_CODES))}"
+        )
+
+
+def _make_matcher(pattern: str):
+    """Case-insensitive matcher: glob if the phrase has wildcards, else substring."""
+    needle = pattern.lower()
+    if any(ch in pattern for ch in "*?["):
+        return lambda name: fnmatch.fnmatchcase(name.lower(), needle)
+    return lambda name: needle in name.lower()
 
 
 def iter_blend_files_newest_first(root: pathlib.Path):
@@ -71,42 +109,79 @@ def iter_blend_files_newest_first(root: pathlib.Path):
     return files
 
 
-def find_mesh_objects(blend: pathlib.Path, keyword: str) -> list[str]:
-    """Return names of MESH objects in ``blend`` whose name contains ``keyword``
-    (case-insensitive). Reads the file offline via BAT."""
+def find_objects(blend: pathlib.Path, pattern: str, obj_type: str | None = None) -> list[str]:
+    """Return names of objects in ``blend`` matching ``pattern`` (and ``obj_type``
+    if given). Reads the file offline via BAT."""
     from blender_asset_tracer import blendfile
 
-    needle = keyword.lower()
+    type_code = type_code_for(obj_type)
+    matches = _make_matcher(pattern)
     hits: list[str] = []
     bfile = blendfile.BlendFile(blend)
     try:
         for block in bfile.find_blocks_from_code(b"OB"):
-            if block.get(b"type") != OB_MESH:
+            if type_code is not None and block.get(b"type") != type_code:
                 continue
             raw = block.get((b"id", b"name"), as_str=True, default="")
             name = raw[2:] if raw[:2] == "OB" else raw  # strip the "OB" id prefix
-            if needle in name.lower():
+            if matches(name):
                 hits.append(name)
     finally:
         bfile.close()
     return hits
 
 
+def find_mesh_objects(blend: pathlib.Path, keyword: str) -> list[str]:
+    """Backwards-compatible helper: mesh objects whose name matches ``keyword``."""
+    return find_objects(blend, keyword, obj_type="mesh")
+
+
+def _parse_args(argv: list[str]):
+    """Return (positional, obj_type, stop_first), or None to request help."""
+    positional: list[str] = []
+    obj_type: str | None = None
+    stop_first = False
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a in ("-h", "--help"):
+            return None
+        elif a in ("--first", "-1"):
+            stop_first = True
+        elif a == "--all":
+            stop_first = False
+        elif a.startswith("--type="):
+            obj_type = a.split("=", 1)[1]
+        elif a in ("--type", "-t"):
+            i += 1
+            obj_type = argv[i] if i < len(argv) else None
+        elif a.startswith("-"):
+            pass  # ignore unknown flags
+        else:
+            positional.append(a)
+        i += 1
+    return positional, obj_type, stop_first
+
+
 def main(argv: list[str]) -> int:
-    args = [a for a in argv if not a.startswith("--")]
-    stop_first = "--first" in argv
-    if not args:
+    parsed = _parse_args(argv)
+    if parsed is None or not parsed[0]:
         print(__doc__)
         return 2
+    positional, obj_type, stop_first = parsed
 
-    root = pathlib.Path(args[0])
-    keyword = args[1] if len(args) > 1 else "billboard"
+    root = pathlib.Path(positional[0])
+    phrase = positional[1] if len(positional) > 1 else "billboard"
     if not root.is_dir():
         print(f"Not a directory: {root}")
         return 2
+    try:
+        type_code_for(obj_type)  # validate early
+    except ValueError as exc:
+        print(f"Error: {exc}")
+        return 2
 
     _ensure_bat_importable()
-
     if not _zstandard_available():
         print(
             "WARNING: the `zstandard` module is not installed.\n"
@@ -114,15 +189,16 @@ def main(argv: list[str]) -> int:
             "    read and would be silently skipped. " + ZSTD_HINT
         )
 
-    total_files = 0
-    matched_files = 0
+    type_label = f" of type {obj_type}" if obj_type and obj_type.lower() not in _ANY_TYPE else ""
+    print(f"Searching for objects{type_label} matching {phrase!r} ...\n")
+
+    total_files = matched_files = 0
     for blend in iter_blend_files_newest_first(root):
         total_files += 1
         try:
-            hits = find_mesh_objects(blend, keyword)
+            hits = find_objects(blend, phrase, obj_type)
         except Exception as exc:  # corrupt/unreadable -> note and keep going
             if _is_zstd_error(exc):
-                # A real dependency gap, not a corrupt file -- stop and tell the user.
                 print(f"\nERROR reading {blend}\n    {ZSTD_HINT}")
                 return 3
             print(f"  ! {blend}  ({type(exc).__name__}: {exc})")
@@ -131,14 +207,14 @@ def main(argv: list[str]) -> int:
             matched_files += 1
             print(f"{blend}")
             for name in hits:
-                print(f"    MESH  {name}")
+                print(f"    {name}")
             if stop_first:
-                print(f"\nStopped at first match (--first).")
+                print("\nStopped at first match (--first).")
                 return 0
 
     print(
         f"\nScanned {total_files} .blend file(s); "
-        f"{matched_files} contained a mesh matching {keyword!r}."
+        f"{matched_files} contained an object matching {phrase!r}{type_label}."
     )
     return 0
 

@@ -79,3 +79,38 @@ def test_zstd_error_is_detected():
     err = OSError("File is compressed with ZStandard, install the `zstandard` module")
     assert fb._is_zstd_error(err) is True
     assert fb._is_zstd_error(OSError("truncated header")) is False
+
+
+# --- generic search (wildcards + type filter) ---------------------------------
+@needs_bat
+def test_find_objects_wildcard_match():
+    assert fb.find_objects(LINKPROJ / "libA.blend", "tr*", "mesh") == ["Tree"]
+    assert fb.find_objects(LINKPROJ / "libA.blend", "*ee", "mesh") == ["Tree"]
+    assert fb.find_objects(LINKPROJ / "libA.blend", "x*", "mesh") == []
+
+
+@needs_bat
+def test_find_objects_any_type_vs_wrong_type():
+    # "Rock" is a mesh; it matches with any-type or mesh, but not as a camera.
+    assert fb.find_objects(LINKPROJ / "libB.blend", "rock", None) == ["Rock"]
+    assert fb.find_objects(LINKPROJ / "libB.blend", "rock", "mesh") == ["Rock"]
+    assert fb.find_objects(LINKPROJ / "libB.blend", "rock", "camera") == []
+
+
+def test_type_code_for():
+    assert fb.type_code_for("mesh") == 1
+    assert fb.type_code_for("CAMERA") == 11
+    assert fb.type_code_for("light") == fb.type_code_for("lamp") == 10
+    assert fb.type_code_for(None) is None
+    assert fb.type_code_for("any") is None
+    with pytest.raises(ValueError):
+        fb.type_code_for("notatype")
+
+
+def test_parse_args():
+    assert fb._parse_args(["-h"]) is None
+    assert fb._parse_args(["dir"]) == (["dir"], None, False)
+    assert fb._parse_args(["dir", "tree", "--type", "mesh", "--first"]) == (
+        ["dir", "tree"], "mesh", True)
+    assert fb._parse_args(["dir", "*cam*", "--type=camera"]) == (
+        ["dir", "*cam*"], "camera", False)
