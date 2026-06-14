@@ -107,6 +107,24 @@ flagged as major.
 - 60 pytest tests pass. In Blender 5.1: a 1K+2K material pair clusters, the 2K wins canonical,
   Apply removes the 1K and repoints its object's slot to the 2K; whitelist override works.
 
+## [0.1.7] — unreleased
+
+### Fixed
+- **Select-in-Outliner for all report findings.** Clicking a finding now selects the object(s)
+  that use the datablock, even for non-object kinds (materials, meshes, images, node groups) —
+  it walks `user_map()` from the datablock up to the using objects. Previously only a few types
+  resolved, so Make Local report items appeared to do nothing.
+- **Make Local on complex files: observability + safety.** Added per-pass and per-100-datablock
+  **heartbeat logging**, `log.debug` of each datablock before make-local (the debug log's last
+  line pinpoints a hanging call), a **no-progress safety break**, and **bounded** purge loops —
+  so a long run is visible (it stopped logging mid-run before) and can't grind indefinitely.
+  Also fixed a latent **library-purge** bug (the user check was reversed and could force-remove
+  still-used libraries).
+
+### Added
+- **Debug log starts fresh** on each enable and on each **file open** (`load_post` handler;
+  the Scene-prop update didn't fire on load before). File is `AssetDoctorDebugLog.txt`.
+
 ## [0.1.6] — report drawing fix
 
 ### Fixed

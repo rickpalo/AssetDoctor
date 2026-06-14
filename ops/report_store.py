@@ -156,14 +156,6 @@ class ASSETDOCTOR_OT_row_label(bpy.types.Operator):
         return {"FINISHED"}
 
 
-# Datablock type -> bpy.data collection, for select-in-Outliner.
-_DATA_COLLECTIONS = {
-    "Object": "objects", "Mesh": "meshes", "Curve": "curves",
-    "Material": "materials", "Image": "images", "NodeGroup": "node_groups",
-    "Armature": "armatures",
-}
-
-
 class ASSETDOCTOR_OT_select_datablock(bpy.types.Operator):
     bl_idname = "assetdoctor.select_datablock"
     bl_label = "Select"
@@ -201,23 +193,49 @@ class ASSETDOCTOR_OT_select_datablock(bpy.types.Operator):
         self.report({"INFO"}, f"Selected {len(targets)} object(s) using {self.name}")
         return {"FINISHED"}
 
+    def _resolve_target(self):
+        """Find the ID datablock matching this finding's type-name + name."""
+        for prop in bpy.data.bl_rna.properties:
+            if prop.type != "COLLECTION":
+                continue
+            coll = getattr(bpy.data, prop.identifier, None)
+            if coll is None:
+                continue
+            try:
+                cand = coll.get(self.name)
+            except (TypeError, AttributeError):
+                continue
+            if cand is not None and type(cand).__name__ == self.type:
+                return cand
+        return None
+
     def _find_objects(self, context):
-        scene_objs = list(context.view_layer.objects)
-        if self.type == "Object":
-            o = bpy.data.objects.get(self.name)
-            return [o] if o is not None and o in scene_objs else []
-        if self.type == "Material":
-            mat = bpy.data.materials.get(self.name)
-            if mat is None:
-                return []
-            return [o for o in scene_objs
-                    if any(s.material == mat for s in o.material_slots)]
-        coll = _DATA_COLLECTIONS.get(self.type)
-        if coll and coll != "objects":
-            db = getattr(bpy.data, coll, {}).get(self.name)
-            if db is not None:
-                return [o for o in scene_objs if o.data == db]
-        return []
+        """Scene objects that use the datablock, directly or transitively.
+
+        e.g. an Image used by a Material used by a Mesh used by an Object resolves
+        to that Object. ``bpy.data.user_map()`` maps each id -> the set of ids that
+        USE it, so we walk it forward from the target up to the using objects."""
+        scene_objs = set(context.view_layer.objects)
+        target = self._resolve_target()
+        if target is None:
+            return []
+        if isinstance(target, bpy.types.Object):
+            return [target] if target in scene_objs else []
+
+        user_map = bpy.data.user_map()
+        found, seen, stack = [], set(), [target]
+        while stack:
+            cur = stack.pop()
+            for user in user_map.get(cur, ()):
+                if user in seen:
+                    continue
+                seen.add(user)
+                if isinstance(user, bpy.types.Object):
+                    if user in scene_objs and user not in found:
+                        found.append(user)
+                else:
+                    stack.append(user)
+        return found
 
 
 def _tree_to_text(nodes, title: str) -> str:

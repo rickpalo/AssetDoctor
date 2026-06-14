@@ -44,7 +44,9 @@ def set_debug_enabled(enabled: bool, blend_path: str = "") -> str | None:
     log = get_logger()
     if enabled and _file_handler is None:
         path = debug_log_path(blend_path)
-        handler = logging.FileHandler(path, mode="a", encoding="utf-8")
+        # mode="w": each enable / file-open starts a FRESH log, so the file holds one
+        # reproduction (easy to read and send) rather than an ever-growing append.
+        handler = logging.FileHandler(path, mode="w", encoding="utf-8")
         handler.setLevel(logging.DEBUG)
         handler.setFormatter(
             logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")

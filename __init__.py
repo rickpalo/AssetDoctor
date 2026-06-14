@@ -12,6 +12,7 @@ pulls in ``bpy``. See docs/ARCHITECTURE.md.
 
 # Populated by register(); used by unregister() to tear down in reverse order.
 _REGISTERED: list = []
+_load_post_handler = None  # the persistent load_post callback, for unregister
 
 
 def _debug_update(self, context):
@@ -21,6 +22,21 @@ def _debug_update(self, context):
     from .log import set_debug_enabled
 
     set_debug_enabled(self.assetdoctor_debug_log, bpy.data.filepath)
+
+
+def _debug_log_on_load(_dummy):
+    """On opening a file with the debug toggle on, start a FRESH log for it.
+
+    The Scene-prop ``update`` callback doesn't fire on load, so without this an
+    enabled toggle wouldn't reactivate after opening a file."""
+    import bpy
+
+    from .log import set_debug_enabled
+
+    scene = bpy.context.scene
+    if scene and getattr(scene, "assetdoctor_debug_log", False):
+        set_debug_enabled(False)  # detach any stale handler
+        set_debug_enabled(True, bpy.data.filepath)  # fresh log for the opened file
 
 
 def register() -> None:
@@ -44,11 +60,18 @@ def register() -> None:
     )
     bpy.types.Scene.assetdoctor_debug_log = bpy.props.BoolProperty(
         name="Enable Debug Log",
-        description="Write a debugLog.txt next to the .blend (or Blender's temp folder if "
-        "unsaved) capturing detailed activity, to help diagnose issues",
+        description="Write AssetDoctorDebugLog.txt next to the .blend (or Blender's temp folder "
+        "if unsaved) capturing detailed activity, to help diagnose issues. A fresh log starts "
+        "each time it's enabled or a file is opened",
         default=False,
         update=_debug_update,
     )
+
+    global _load_post_handler
+    from bpy.app.handlers import persistent
+
+    _load_post_handler = persistent(_debug_log_on_load)
+    bpy.app.handlers.load_post.append(_load_post_handler)
 
     # Live progress for the modal folder scan (shown in the panel).
     bpy.types.WindowManager.assetdoctor_scan_active = bpy.props.BoolProperty(default=False)
@@ -77,6 +100,11 @@ def register() -> None:
 
 def unregister() -> None:
     import bpy
+
+    global _load_post_handler
+    if _load_post_handler is not None and _load_post_handler in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.remove(_load_post_handler)
+    _load_post_handler = None
 
     for attr in ("assetdoctor_scan_dir", "assetdoctor_debug_log"):
         if hasattr(bpy.types.Scene, attr):

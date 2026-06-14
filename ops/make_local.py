@@ -42,8 +42,15 @@ def _gather_linked():
     return items
 
 
-def _localize_all(max_passes: int = 12) -> int:
-    """Make every linked / overridden datablock local. Returns passes used."""
+def _localize_all(log, max_passes: int = 50) -> int:
+    """Make every linked / overridden datablock local. Returns passes used.
+
+    Logs a heartbeat per pass (and every 100 datablocks) so a long run on a
+    complex file is observable in the console / debug log instead of looking
+    hung. Stops early if a pass makes no progress (e.g. circular links or
+    un-resolvable overrides), so it can never grind indefinitely."""
+    prev = None
+    count = 0
     for n in range(1, max_passes + 1):
         remaining = [
             db
@@ -51,31 +58,48 @@ def _localize_all(max_passes: int = 12) -> int:
             for db in coll
             if db.library is not None or db.override_library is not None
         ]
-        if not remaining:
+        count = len(remaining)
+        log.info("F2 localize pass %d: %d linked/override datablock(s) remaining", n, count)
+        if count == 0:
             return n - 1
-        for db in remaining:
+        if prev is not None and count >= prev:
+            log.warning("F2 localize: no progress at %d remaining — stopping (likely circular "
+                        "links or un-resolvable overrides)", count)
+            return n
+        prev = count
+        for i, db in enumerate(remaining, 1):
+            log.debug("F2 make_local: %s", db.name)  # last line = culprit if a call hangs
             try:
                 db.make_local(clear_liboverride=True)
             except (RuntimeError, ReferenceError):
                 pass
+            if i % 100 == 0:
+                log.info("F2 localize pass %d: %d/%d datablocks", n, i, count)
+    log.warning("F2 localize: reached max passes (%d); %d datablock(s) may remain",
+                max_passes, count)
     return max_passes
 
 
-def _purge_libraries():
-    # Purge orphaned datablocks until stable (make_local can leave copies behind).
-    while bpy.data.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True):
-        pass
-    # Remove now-unused libraries. Library.users can report a phantom count after
-    # make_local, so user_map() is the authority on what truly references a library.
+def _purge_libraries(log):
+    # Purge orphaned datablocks until stable (make_local can leave copies behind);
+    # bounded so it can't loop forever on a pathological file.
+    for _ in range(20):
+        if not bpy.data.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True):
+            break
+    # Remove now-unused libraries. user_map() maps id -> the ids that USE it, so a
+    # library with no entry/empty set has no users and is safe to remove. (Library.users
+    # can report a phantom count after make_local, so don't trust it.)
     user_map = bpy.data.user_map()
     for lib in list(bpy.data.libraries):
-        if not any(lib in used for used in user_map.values()):
+        if not user_map.get(lib):
             try:
                 bpy.data.libraries.remove(lib)
             except RuntimeError:
                 pass
-    while bpy.data.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True):
-        pass
+    for _ in range(20):
+        if not bpy.data.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True):
+            break
+    log.info("F2 purge: %d librar(ies) remain", len(bpy.data.libraries))
 
 
 class ASSETDOCTOR_OT_make_local(bpy.types.Operator):
@@ -144,8 +168,8 @@ class ASSETDOCTOR_OT_make_local(bpy.types.Operator):
                 return {"CANCELLED"}
             out = bpy.path.abspath(self.filepath) if self.filepath else \
                 os.path.splitext(src)[0] + "_local.blend"
-            passes = _localize_all()
-            _purge_libraries()
+            passes = _localize_all(log)
+            _purge_libraries(log)
             log.debug("F2 NEW_FILE: %d localize pass(es), out=%s", passes, out)
             bpy.ops.wm.save_as_mainfile(filepath=out, copy=True)
             bpy.ops.wm.revert_mainfile()  # restore the original linked session
@@ -158,8 +182,8 @@ class ASSETDOCTOR_OT_make_local(bpy.types.Operator):
             from .safety import auto_backup
 
             backup = auto_backup(context)
-            _localize_all()
-            _purge_libraries()
+            _localize_all(log)
+            _purge_libraries(log)
             tail = f"Backup: {backup}" if backup else "(no backup written — save the file to enable backups)"
             self.report(
                 {"WARNING"},

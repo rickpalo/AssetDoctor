@@ -1,5 +1,35 @@
 # AssetDoctor — TODO / backlog
 
+## Progress & responsiveness — ALL actions
+- [ ] **Progress bar + status text for every action** (F2/F3/F4/geometry/resource/Profile Render),
+  like the F1 modal scan. In-session ops run synchronously and freeze the UI; on complex files
+  this looks hung. Proper fix: run them as **modal operators** that process work in chunks per
+  timer tick, update a progress bar + status, and allow **Esc** to cancel.
+- [ ] **F2 (Make Local) performance on complex files.** Reported: a complex file (circular links
+  + library overrides + botaniq/engon assets) ran **~4 hours** and stopped logging. Root cause:
+  per-id `make_local(clear_liboverride=True)` over thousands of override/indirect datablocks ×
+  multiple passes is pathologically slow, and there was **no logging inside the loop** (so it
+  looked dead). **Mitigated (v0.1.7):** per-pass + per-100 heartbeat logging, `log.debug` of each
+  datablock name (so the debug log's last line pinpoints a hanging call), a **no-progress safety
+  break**, and bounded purge loops; also fixed a latent bug where the library-purge user-check was
+  reversed (could force-remove still-used libraries). **Still TODO:** make it actually fast +
+  modal — evaluate `bpy.ops.object.make_local(type='ALL')` for the bulk, smarter override
+  handling, and chunked progress with cancel.
+
+## New requirement — smart missing-file relinker (F6)
+- [ ] **Follow the dependency chain and find/replace missing files.** Beyond F1's *detection* of
+  broken links / absolute paths, add an intelligent **resolve** step that walks
+  object → material → texture image (and library → datablock) chains and, for each missing file:
+  - **suggest** likely matches — search sibling/known asset dirs, apply drive/root remaps
+    (e.g. `D:\…` → `E:\…`, the `WindowsApps` Blender-bundle path → the installed datafiles),
+    fuzzy-match by filename/basename;
+  - offer **apply**: relink single, or **batch** "remap all under root X to root Y" /
+    "replace path prefix A→B", with a **dry-run preview** first (report-first + backup).
+  BAT can rewrite paths offline; in-session we can also set `image.filepath` / `library.filepath`
+  and reload. Pairs with F1 (which already finds the problems). Real-project data shows common
+  patterns: same file under different drive roots, and absolute paths into per-machine library
+  folders — good candidates for prefix-remap rules.
+
 ## Report UI v2 (from real-project testing)
 
 **Root cause noted:** the N-panel doesn't virtualize manually-drawn rows, so a large report
@@ -37,7 +67,9 @@ items below.
   both hardcode "prefer local" — this makes it configurable per data type.
 
 ## Decided — to implement (batch)
-- [ ] **Debug log: fresh per file-open** (decision made; not a continuous append). The log
+- [x] **Debug log: fresh per file-open** — DONE (v0.1.7): handler opens in `mode="w"`, and a
+  `load_post` handler re-arms a fresh log when a file opens with the toggle on.
+- [ ] ~~(original note)~~ **Debug log: fresh per file-open** (decision made; not a continuous append). The log
   captures one reproduction to send for diagnosis, so each session should be a clean,
   single-session file. Implementation:
   - open the handler in `mode="w"` (truncate) so enabling starts a fresh log;
