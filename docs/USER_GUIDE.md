@@ -36,6 +36,10 @@ unclear memory/disk usage.
 
 ![Adding the remote repository](images/install-repository.png)
 
+Once added, AssetDoctor appears in **Get Extensions** ready to install:
+
+![AssetDoctor in the repository after adding it](images/install-repository-post.png)
+
 ### Alternative: install from disk (no auto-update)
 **Get Extensions → ⌄ → Install from Disk…** and pick `assetdoctor-<version>.zip`
 (from the [Releases page](https://github.com/rickpalo/AssetDoctor/releases)). You'll update by
@@ -142,6 +146,8 @@ How "same" is decided: a **resolution-agnostic fingerprint** of the material's n
 - **Dedup & Remap (apply)** — auto-backup, then repoint every user of a duplicate onto the
   **canonical** material and remove the local duplicates. Supports Undo.
 
+![A Duplicate Materials report](images/material-dedup-report.png)
+
 **Choosing the canonical** (configurable in [Preferences](#preferences)):
 1. a **whitelisted** name is always kept;
 2. a **blacklisted** name is never kept;
@@ -206,6 +212,8 @@ Below the main panel, the **Report** panel (collapsed by default) shows results 
   later Geometry scan. Use the **selector row** at the top to switch between the reports you've run.
 - **Tooltips.** Hover any row to see the **full text** (e.g. a full broken-link path) even when
   the narrow panel truncates it.
+
+  ![A report row tooltip showing full text](images/report-tooltip.png)
 - **Click to select.** Clicking a finding that names a datablock **selects the object(s)** that
   use it (the Outliner follows the active object); a material also gets its slot highlighted.
   Orphan/unused data with no object users shows a hint to view it via Outliner → Blender File /

@@ -4,6 +4,10 @@ I can't capture these myself (no GUI control), so the User Guide references them
 placeholders. Drop PNGs with these exact names into this folder and they'll render in
 [../USER_GUIDE.md](../USER_GUIDE.md) and the main README.
 
+**Status (2026-06-15):** all captured **except `report-panel.png`** (a dedicated generic
+Report-panel shot is still to come). `install-repository-post.png` was added for the
+post-add install state.
+
 Capture in Blender 5.x at a readable size (≈ the N-panel width; crop tight). Suggested ~1× UI
 scale, light or dark theme is fine — just be consistent.
 
@@ -16,6 +20,7 @@ scale, light or dark theme is fine — just be consistent.
 | `resource-panel.png` | The **Resource Usage** panel | Run *Analyze Memory/Disk* (ideally also *Profile Render*), expand the Images/Meshes types so the size columns + "Profiled real peak RAM" line show. |
 | `preferences.png` | AssetDoctor **Preferences** | Edit → Preferences → Add-ons → AssetDoctor; show backup toggle/dir, resolution tokens, white/black lists. |
 | `install-repository.png` | **Add Remote Repository** dialog | Get Extensions → ⌄ → Repositories → Add Remote Repository, with the `…/index.json` URL filled in. For the install section. |
+| `install-repository-post.png` | AssetDoctor **in the repo after adding** | Get Extensions list showing AssetDoctor available to install from the rickpalo.github.io repo. |
 | `material-dedup-report.png` *(optional)* | A **material dedup** report | Find Duplicates on a file with a 1K/2K pair; show the "keep X / remap N" finding. Good for the F3 section. |
 
 Tips:
