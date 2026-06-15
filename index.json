@@ -47,6 +47,29 @@
       "archive_url": "./assetdoctor-0.1.6.zip",
       "archive_size": 168702,
       "archive_hash": "sha256:17851e799762e7d8533f9630fdcc48af79a3f07a7826e39c2cddc345f33f5962"
+    },
+    {
+      "schema_version": "1.0.0",
+      "id": "assetdoctor",
+      "name": "AssetDoctor",
+      "tagline": "Map & clean linked assets, materials and orphan data",
+      "version": "0.1.7",
+      "type": "add-on",
+      "maintainer": "rickpalo <rap2010@comcast.net>",
+      "license": [
+        "SPDX:GPL-3.0-or-later"
+      ],
+      "blender_version_min": "5.0.0",
+      "website": "https://github.com/rickpalo/AssetDoctor",
+      "permissions": {
+        "files": "Scan .blend files, write reports, and save backups before edits"
+      },
+      "python_versions": [
+        "3"
+      ],
+      "archive_url": "./assetdoctor-0.1.7.zip",
+      "archive_size": 156396,
+      "archive_hash": "sha256:03c0425e94cb4daa495964f09613b4f17cc7a38d09e28113e7020b630e75ebd1"
     }
   ]
 }
