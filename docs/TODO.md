@@ -1,5 +1,48 @@
 # AssetDoctor — TODO / backlog
 
+## Automated Cleanup (NEXT major feature — requested 2026-06-15)
+
+Goal: a one-click pipeline that runs the chosen cleanups together, with a combined report and a
+before/after/savings summary. Gated on the individual modal sections being verified in the UI.
+
+**UI restructure (nested collapsible sub-panels):**
+- **Automated Cleanup** — new sub-panel at the **very top** (`bl_order` negative), default **open**.
+  - An **include checkbox per function** (Scene BoolProps, persisted in the file).
+  - **Report Only** button → runs each included function's *report* path and shows one **combined
+    report** (a section per function).
+  - **Apply & Report** button → applies each included function and produces a
+    **before / after / savings** report.
+- **Manual Cleanup** — new sub-panel, default **collapsed**, that **parents the existing per-
+  function sub-panels** (Make Local, Duplicate Materials, Orphans, Duplicate Geometry) as nested
+  children. (Project link-map + Resource Analyzer are analysis, not cleanup — leave them as their
+  own sections; Utilities stays last.) Blender supports nesting `bl_parent_id` chains.
+
+**Proposed design / decisions (confirm before building):**
+- **In-scope cleanups + run order** (order matters — later steps clean up what earlier ones
+  orphan): 1) Make Local *(optional — see below)* → 2) Duplicate Materials dedup → 3) Duplicate
+  Geometry instance → 4) Orphans purge **last**. Resource Analyzer is **not** a toggle; it's the
+  before/after *measurement*.
+- **Make Local in the pipeline?** It's a transformation with modes (New File / In Place), more
+  destructive than the others. Recommend: offer it **off by default**, **In Place only** when
+  ticked (New File's copy+revert doesn't compose with a combined apply).
+- **One backup** at the start of Apply (single restore point), not one per function.
+- **Savings metrics:** snapshot `core.resource` totals (est. RAM / VRAM) + datablock counts
+  (materials, meshes, images, libraries, orphans) **before and after**; report deltas. True **disk**
+  savings needs a save (note it, or offer "save after"). Per-function counts (remapped/removed/
+  purged/localized) come from each step.
+- **Combined report:** new feature key (e.g. `auto`) in `report_store`; one report with a section
+  per function + a top **savings summary**.
+
+**Implementation:** reuse `ops/progress.ModalProgressMixin` — the automated op's `run_steps`
+`yield from` each included function's steps in sequence (weighted progress across steps, ESC
+cancels between steps; cancel after the single start-of-run backup is safe). To avoid duplicating
+logic, refactor each function's core work into shared helpers returning `(report, apply-counts)`
+that both the manual op and the automated op call.
+
+**Open questions for the user:** (a) exact include-set + whether Make Local is offered; (b) should
+Apply offer "save the file afterwards" so disk savings are real; (c) is Automated open-by-default
+and Manual collapsed-by-default the right emphasis.
+
 ## Progress & responsiveness — ALL actions
 - [x] **Progress bar + status text for every action** — DONE for **F1, F2, F3, F4, Geometry, and
   Resource Analyzer**. `ops/progress.ModalProgressMixin` packages the pattern (subclass supplies a
