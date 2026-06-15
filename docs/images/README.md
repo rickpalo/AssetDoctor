@@ -4,9 +4,9 @@ I can't capture these myself (no GUI control), so the User Guide references them
 placeholders. Drop PNGs with these exact names into this folder and they'll render in
 [../USER_GUIDE.md](../USER_GUIDE.md) and the main README.
 
-**Status (2026-06-15):** all captured **except `report-panel.png`** (a dedicated generic
-Report-panel shot is still to come). `install-repository-post.png` was added for the
-post-add install state.
+**Status (2026-06-15):** all captured. Extra shots beyond the table below:
+`install-repository-post.png` (post-add install state) and `progress-bar.png` (the shared
+progress bar/status + Esc shown for any long-running action).
 
 Capture in Blender 5.x at a readable size (≈ the N-panel width; crop tight). Suggested ~1× UI
 scale, light or dark theme is fine — just be consistent.
@@ -15,6 +15,7 @@ scale, light or dark theme is fine — just be consistent.
 |---|---|---|
 | `panel-overview.png` | The full **AssetDoctor** N-panel, all sections expanded | The hero shot for the README. Press `N` in the 3D viewport → AssetDoctor tab. Show the version + ? icon in the header. |
 | `scan-progress.png` | The **Scan Link Map** progress bar mid-scan | Run F1 on a folder with several `.blend` files; grab while the progress bar + "N / M files" is visible. |
+| `progress-bar.png` | The **shared progress bar** for any modal action | The top-of-panel progress bar + status + "Press ESC to cancel", e.g. during a dedup/orphan scan. |
 | `report-panel.png` | The **Report** panel with a tree expanded | Run e.g. *Orphans → Scan* or *Materials → Find Duplicates*, expand a couple of rows; show the per-feature **selector row** at the top and the **Export…** button. |
 | `report-tooltip.png` *(optional)* | A **row tooltip** showing full text | Hover a long item (e.g. a broken-link path) so the full-text tooltip is visible. Nice-to-have for the "tooltips" section. |
 | `resource-panel.png` | The **Resource Usage** panel | Run *Analyze Memory/Disk* (ideally also *Profile Render*), expand the Images/Meshes types so the size columns + "Profiled real peak RAM" line show. |

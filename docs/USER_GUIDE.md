@@ -91,6 +91,8 @@ analysis) run with a **progress bar + status** at the top of the panel and can b
 **Esc**. Only **Profile Render** runs in one blocking step (a render can't be reported
 incrementally).
 
+![Progress bar with status and Esc-to-cancel](images/progress-bar.png)
+
 ---
 
 ## Features
