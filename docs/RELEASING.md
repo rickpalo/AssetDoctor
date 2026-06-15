@@ -32,27 +32,28 @@ Repo: https://github.com/rickpalo/AssetDoctor  ·  Pages repo served from branch
    ```
    gh release create vX.Y.Z dist/assetdoctor-X.Y.Z.zip --title "AssetDoctor vX.Y.Z" --notes "…"
    ```
-5. **Refresh the Pages repo index** (this is what drives auto-update). Keep older version
-   zips alongside the new one so the index offers version history:
+5. **Refresh the Pages repo index** (this is what drives auto-update). Publish a
+   **single-version index** — only the *latest* zip in the repo dir before generating:
    ```
-   # stage zips + regenerate the index
-   Copy-Item dist\*.zip .pages\
-   blender --command extension server-generate --repo-dir .pages
-
-   # publish to gh-pages via a throwaway worktree
-   git worktree add -b _ghpages_tmp ..\ad_ghpages origin/gh-pages
-   Copy-Item .pages\* ..\ad_ghpages\ -Force      # zips + index.json
-   git -C ..\ad_ghpages add -A
-   git -C ..\ad_ghpages commit -m "gh-pages: index vX.Y.Z"
-   git -C ..\ad_ghpages push origin HEAD:gh-pages
-   git worktree remove ..\ad_ghpages --force
-   git branch -D _ghpages_tmp
+   # check out gh-pages into .pages, based on ORIGIN (the local ref lags behind)
+   git worktree add -B gh-pages .pages origin/gh-pages
+   Remove-Item .pages\assetdoctor-*.zip          # drop the previous version's zip
+   Copy-Item dist\assetdoctor-X.Y.Z.zip .pages\  # only the new one
+   blender --command extension server-generate --repo-dir .pages   # must say "found 1 packages"
+   git -C .pages add -A
+   git -C .pages commit -m "gh-pages: index vX.Y.Z"
+   git -C .pages push origin gh-pages
+   git worktree remove .pages --force
    ```
 6. **Verify:** `https://rickpalo.github.io/AssetDoctor/index.json` shows the new `version`
-   and its zip returns HTTP 200.
+   (and ONLY that version), and its zip returns HTTP 200.
 
 Notes:
-- `.pages/` is the local staging dir (git-ignored on `main`); the real content lives on the
-  `gh-pages` branch.
-- The `index.json` uses relative `archive_url`s, so `index.json` and the zips must sit in the
-  same directory (they do, at the Pages root).
+- **Single version only.** Do NOT leave older zips in the repo dir. `server-generate` would emit
+  one index entry per zip with the *same* `blender_version` range and warn "conflicting blender
+  versions" — Blender then shows the newest as available but reinstalls the FIRST/oldest entry,
+  so updates appear stuck (hit 0.1.5↔0.1.7, 2026-06-15). Version history lives on the
+  [Releases page](https://github.com/rickpalo/AssetDoctor/releases), not in the index.
+- Base the worktree on `origin/gh-pages` (`-B`): the local `gh-pages` ref can lag behind origin.
+- `index.json` uses a relative `archive_url`, so it and the zip must sit in the same directory
+  (they do, at the Pages root). `.pages/` is git-ignored on `main`.
