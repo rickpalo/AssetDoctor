@@ -4,12 +4,19 @@ Report-first by default; on Apply (after auto-backup) every duplicate's users
 are remapped onto the chosen canonical via ``ID.user_remap`` and local victims
 are removed. Linked victims keep existing in their library (we only repoint
 their local users).
+
+Runs as a modal operator: fingerprinting every material is the heavy part, so it
+is chunked through :func:`_gather_steps` (progress bar + ESC). ``_gather`` keeps a
+synchronous path for tests/scripting.
 """
 
 import bpy
 
 from ..core.f3_materials import build_dedup_plan, parse_name_list
 from ..prefs import get_prefs
+from .progress import ModalProgressMixin
+
+_FP_CHUNK = 32  # materials fingerprinted between progress yields
 
 
 def _material_id(mat) -> str:
@@ -30,15 +37,19 @@ def _max_texture_res(mat) -> int:
     return best
 
 
-def _gather(context):
+def _gather_steps(context):
+    """Fingerprint every material, yielding ``(fraction, status)`` every
+    ``_FP_CHUNK``. Returns ``(items, id_to_mat)`` (via the generator's value)."""
     from .extract import extract_material
     from ..core.fingerprint import fingerprint_material
 
     prefs = get_prefs(context)
     res_pattern = prefs.resolution_token_regex if prefs else None
 
+    mats = list(bpy.data.materials)
+    total = len(mats) or 1
     items, id_to_mat = [], {}
-    for mat in bpy.data.materials:
+    for i, mat in enumerate(mats, 1):
         mid = _material_id(mat)
         id_to_mat[mid] = mat
         try:
@@ -52,14 +63,26 @@ def _gather(context):
             "linked": mat.library is not None,
             "max_res": _max_texture_res(mat),
         })
+        if i % _FP_CHUNK == 0:
+            yield (0.8 * i / total, f"Fingerprinting materials {i}/{total}…")
     return items, id_to_mat
 
 
-class ASSETDOCTOR_OT_material_dedup(bpy.types.Operator):
+def _gather(context):
+    """Synchronous gather (drains :func:`_gather_steps`). Kept for tests/scripting."""
+    gen = _gather_steps(context)
+    try:
+        while True:
+            next(gen)
+    except StopIteration as done:
+        return done.value
+
+
+class ASSETDOCTOR_OT_material_dedup(ModalProgressMixin, bpy.types.Operator):
     bl_idname = "assetdoctor.material_dedup"
     bl_label = "Find Duplicate Materials"
     bl_description = "Find duplicate / multi-resolution materials and remap them to a single source"
-    bl_options = {"REGISTER", "UNDO"}
+    bl_options = {"REGISTER"}
 
     apply: bpy.props.BoolProperty(
         name="Apply (remap & purge)",
@@ -72,37 +95,42 @@ class ASSETDOCTOR_OT_material_dedup(bpy.types.Operator):
     def description(cls, context, properties):
         if properties.apply:
             return ("Remap duplicate/near-duplicate (incl. 1K/2K) materials onto a single "
-                    "canonical and remove local duplicates. Takes a backup first; supports Undo")
+                    "canonical and remove local duplicates. Takes a backup first")
         return ("Find duplicate / multi-resolution materials and report which would be merged "
                 "(no changes). Canonical chosen via the white/black lists in Preferences")
 
-    def execute(self, context):
+    def cancel_message(self):
+        return "Material dedup cancelled" + (" (backup preserved)" if self.apply else "")
+
+    def run_steps(self, context):
         from ..log import get_logger
+        from .report_store import stash_report
 
         log = get_logger()
         prefs = get_prefs(context)
         whitelist = parse_name_list(prefs.material_whitelist if prefs else "")
         blacklist = parse_name_list(prefs.material_blacklist if prefs else "")
 
-        items, id_to_mat = _gather(context)
-        report, plan = build_dedup_plan(items, whitelist, blacklist)
+        items, id_to_mat = yield from _gather_steps(context)
 
-        from .report_store import stash_report
+        yield (0.85, "Building report…")
+        report, plan = build_dedup_plan(items, whitelist, blacklist)
         stash_report(context, report, "f3")
         for f in report.findings:
             log.info("F3 [%s] %s: %s", f.severity, f.category, f.message)
-
         summary = next((f for f in report.findings if f.category == "summary"), None)
         msg = summary.message if summary else "scan complete"
 
         if not self.apply or not plan:
             level = "WARNING" if report.count("warning") else "INFO"
             self.report({level}, msg + (" (dry run)" if not self.apply else ""))
-            return {"FINISHED"}
+            return
 
         from .safety import auto_backup
 
+        yield (0.9, "Backing up…")
         backup = auto_backup(context)
+        yield (0.95, "Remapping duplicates…")
         remapped, removed = 0, 0
         for group in plan:
             canonical = id_to_mat.get(group["canonical"])
@@ -123,4 +151,3 @@ class ASSETDOCTOR_OT_material_dedup(bpy.types.Operator):
         tail = f"Remapped {remapped}, removed {removed} local duplicate(s)."
         tail += f" Backup: {backup}" if backup else " (no backup written)"
         self.report({"INFO"}, f"{msg}. {tail}")
-        return {"FINISHED"}

@@ -17,9 +17,12 @@ from ..core.resource import (
 )
 from ..core.resource_tree import build_resource_tree
 from ..core.tree import nodes_to_json, top_level_keys
+from .progress import ModalProgressMixin
 
 RESOURCE_PROP = "assetdoctor_resource_tree"
 RESOURCE_EXPANDED = "assetdoctor_resource_expanded"
+
+_EST_CHUNK = 64  # datablocks estimated between progress yields
 
 
 def _image_disk(img) -> int:
@@ -32,9 +35,16 @@ def _image_disk(img) -> int:
         return 0
 
 
-def _gather(context):
+def _gather_steps(context):
+    """Estimate RAM/VRAM/disk for every image + mesh, yielding ``(fraction,
+    status)`` every ``_EST_CHUNK``. Returns the ``items`` list."""
+    images = list(bpy.data.images)
+    meshes = list(bpy.data.meshes)
+    total = (len(images) + len(meshes)) or 1
+
     items = []
-    for img in bpy.data.images:
+    done = 0
+    for img in images:
         w, h = (img.size[0], img.size[1]) if len(img.size) >= 2 else (0, 0)
         est = image_estimate({"width": w, "height": h, "depth": img.depth})
         items.append({
@@ -42,7 +52,10 @@ def _gather(context):
             "ram": est["ram"], "vram": est["vram"], "disk": _image_disk(img),
             "users": img.users,
         })
-    for me in bpy.data.meshes:
+        done += 1
+        if done % _EST_CHUNK == 0:
+            yield (0.85 * done / total, f"Estimating resources {done}/{total}…")
+    for me in meshes:
         est = mesh_estimate({
             "verts": len(me.vertices), "edges": len(me.edges),
             "loops": len(me.loops), "polys": len(me.polygons),
@@ -51,10 +64,23 @@ def _gather(context):
             "type": "Mesh", "name": me.name,
             "ram": est["ram"], "vram": est["vram"], "disk": 0, "users": me.users,
         })
+        done += 1
+        if done % _EST_CHUNK == 0:
+            yield (0.85 * done / total, f"Estimating resources {done}/{total}…")
     return items
 
 
-class ASSETDOCTOR_OT_analyze_resources(bpy.types.Operator):
+def _gather(context):
+    """Synchronous gather (drains :func:`_gather_steps`). Kept for tests/scripting."""
+    gen = _gather_steps(context)
+    try:
+        while True:
+            next(gen)
+    except StopIteration as done:
+        return done.value
+
+
+class ASSETDOCTOR_OT_analyze_resources(ModalProgressMixin, bpy.types.Operator):
     bl_idname = "assetdoctor.analyze_resources"
     bl_label = "Analyze Resource Usage"
     bl_description = (
@@ -63,12 +89,17 @@ class ASSETDOCTOR_OT_analyze_resources(bpy.types.Operator):
     )
     bl_options = {"REGISTER"}
 
-    def execute(self, context):
+    def cancel_message(self):
+        return "Resource analysis cancelled"
+
+    def run_steps(self, context):
         from ..log import get_logger
 
         log = get_logger()
-        nodes, totals = build_resource_tree(_gather(context))
+        items = yield from _gather_steps(context)
 
+        yield (0.9, "Building resource tree…")
+        nodes, totals = build_resource_tree(items)
         wm = context.window_manager
         setattr(wm, RESOURCE_PROP, nodes_to_json(nodes))
         setattr(wm, RESOURCE_EXPANDED, "\n".join(top_level_keys(nodes)))
@@ -77,7 +108,6 @@ class ASSETDOCTOR_OT_analyze_resources(bpy.types.Operator):
                f"VRAM {human_bytes(totals['vram'])}, disk {human_bytes(totals['disk'])}")
         log.info("F5 %s", msg)
         self.report({"INFO"}, msg + " (estimates; see Resource panel)")
-        return {"FINISHED"}
 
 
 class ASSETDOCTOR_OT_profile_render(bpy.types.Operator):

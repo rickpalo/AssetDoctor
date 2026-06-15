@@ -86,6 +86,11 @@ is **collapsible** — click its header to expand/collapse it; Blender remembers
 Every button has a tooltip describing exactly what it does (and, for the apply variants, that
 it backs up first).
 
+Long-running actions (link-map scan, Make Local, material/geometry dedup, orphan scan, resource
+analysis) run with a **progress bar + status** at the top of the panel and can be cancelled with
+**Esc**. Only **Profile Render** runs in one blocking step (a render can't be reported
+incrementally).
+
 ---
 
 ## Features

@@ -1,11 +1,12 @@
 # AssetDoctor — TODO / backlog
 
 ## Progress & responsiveness — ALL actions
-- [ ] **Progress bar + status text for every action** — DONE for **F1** (scan) and **F2** (Make
-  Local). Still TODO: **F3/F4/geometry/resource/Profile Render**. The plumbing now exists: shared
-  `assetdoctor_op_*` WM props + `ops/progress.py` (`set_progress`/`clear_progress`) draw one bar
-  at the top of the panel; copy the F2 modal pattern (a `*_steps` generator drained by `execute`
-  and stepped one chunk per timer tick by `modal`, ESC to cancel).
+- [x] **Progress bar + status text for every action** — DONE for **F1, F2, F3, F4, Geometry, and
+  Resource Analyzer**. `ops/progress.ModalProgressMixin` packages the pattern (subclass supplies a
+  `run_steps(context)` generator yielding `(fraction, status)`; `execute` drains it, the modal
+  steps it under a per-tick time budget with ESC-to-cancel). The heavy per-datablock loops are
+  chunked via `_gather_steps`. **Only Profile Render** stays synchronous (a single render call
+  can't be chunked) — left intentionally.
 - [x] **F2 (Make Local) performance on complex files.** Was: per-id
   `make_local(clear_liboverride=True)` over thousands of override/indirect datablocks × multiple
   passes ran **~hours** and stopped logging. **Fixed (v0.1.7):** one bulk

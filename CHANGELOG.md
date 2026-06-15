@@ -3,6 +3,24 @@
 All notable changes to AssetDoctor. Versioning is patch-only (0.1.x) until a change is
 flagged as major.
 
+## [0.1.8] — progress bars for every scan/apply — unreleased
+
+### Added
+- **Modal progress bar + ESC for F3, F4, Geometry, and Resource Analyzer.** Find Duplicate
+  Materials, Scan Orphans (+ Purge), Instance Duplicate Geometry, and Analyze Resource Usage now
+  run as modal operators with the shared progress bar/status and ESC-to-cancel — the heavy
+  per-datablock fingerprinting/estimation is chunked through a `_gather_steps` generator, so big
+  files no longer freeze the UI while they "look hung". Only **Profile Render** stays synchronous
+  (a single render can't be chunked).
+- **`ModalProgressMixin`** (`ops/progress.py`) — packages the modal/timer/ESC/progress-bar
+  pattern with a per-tick time budget, so an operator only supplies a `run_steps(context)`
+  generator that yields `(fraction, status)`. `execute` drains it for EXEC_DEFAULT/scripting/tests.
+
+### Changed
+- F3 (materials) and Geometry instancing apply paths **no longer push a native Undo step** (modal
+  operators); they continue to take a timestamped **auto-backup before mutating** (same safety
+  model as F2). Restore from the backup to revert.
+
 ## [0.1.0] — M0 Scaffold — unreleased
 
 ### Added
