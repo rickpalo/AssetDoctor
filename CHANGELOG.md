@@ -3,6 +3,17 @@
 All notable changes to AssetDoctor. Versioning is patch-only (0.1.x) until a change is
 flagged as major.
 
+## [0.1.9] — unreleased
+
+### Changed
+- **Duplicate Materials report restructured.** The top row now shows the headline
+  **`XX (YY Local & ZZ Linked)`** (total removable duplicates, split by local vs linked), with two
+  child rows **Local** / **Linked** that expand to the actual material lists. The redundant
+  bottom "Summary" row was removed. Apply behaviour is unchanged (the remap plan is the same).
+- Generic report model gained an optional **`Finding.detail`** (right-aligned per-row value) and
+  **`Report.category_details`** (per-category header override) — both serialized; used by F3 and
+  available to any feature. `report_to_tree` renders them.
+
 ## [0.1.8] — progress bars for every scan/apply
 
 ### Added

@@ -25,6 +25,7 @@ _CATEGORY_TITLES = {
     "fake_only": "Fake-user only",
     "identical": "Identical datablocks",
     "duplicate_group": "Duplicate Materials",
+    "duplicate_material": "Duplicate Materials",
     "linked_victim": "Linked duplicates",
     "summary": "Summary",
 }
@@ -102,15 +103,18 @@ def report_to_tree(report: Report) -> list[TreeNode]:
     nodes: list[TreeNode] = []
     for cat, findings in groups.items():
         cat_key = f"{report.feature}:{cat}"
+        # Category row detail: a feature-supplied override (e.g. F3's local/linked
+        # breakdown) or, by default, the number of findings in the category.
+        detail = report.category_details.get(cat) or str(len(findings))
         cat_node = TreeNode(
             key=cat_key,
             label=_CATEGORY_TITLES.get(cat, cat),
             severity=_max_severity(f.severity for f in findings),
-            detail=str(len(findings)),  # count shown on the (collapsed) category row
+            detail=detail,
         )
         for i, f in enumerate(findings):
             f_key = f"{cat_key}:{i}"
-            f_node = TreeNode(key=f_key, label=f.message, severity=f.severity)
+            f_node = TreeNode(key=f_key, label=f.message, severity=f.severity, detail=f.detail)
             for j, item in enumerate(f.items):
                 f_node.children.append(
                     TreeNode(key=f"{f_key}:{j}", label=item, severity=f.severity,

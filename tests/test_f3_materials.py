@@ -53,7 +53,7 @@ def test_glob_patterns_match():
     assert best["id"] == "wood_master"
 
 
-def test_build_plan_groups_and_summary():
+def test_build_plan_groups_and_report():
     items = [
         _m("WoodA", "WoodA", max_res=1024),
         _m("WoodB", "WoodB", max_res=2048),
@@ -64,20 +64,37 @@ def test_build_plan_groups_and_summary():
     group = plan[0]
     assert group["canonical"] == "WoodB"  # higher res
     assert group["victims"] == ["WoodA"]
-    summary = next(f for f in report.findings if f.category == "summary")
-    assert summary.data["groups"] == 1
-    assert summary.data["victims"] == 1
+    # No Summary finding anymore; the headline lives on the category row.
+    assert not any(f.category == "summary" for f in report.findings)
+    assert report.category_details["duplicate_material"] == "1 (1 Local & 0 Linked)"
+    local = next(f for f in report.findings if f.message == "Local")
+    assert local.items == ["WoodA"] and local.detail == "1"
 
 
-def test_build_plan_flags_linked_victims():
+def test_build_plan_splits_local_and_linked_victims():
     items = [
-        _m("WoodLocal", "Wood", linked=False, max_res=2048),
-        _m("WoodLib", "Wood", linked=True, max_res=2048),
+        _m("WoodLocal", "Wood", linked=False, max_res=2048),   # canonical (local preferred)
+        _m("WoodLib", "Wood", linked=True, max_res=2048),      # linked victim
+        _m("WoodLocal2", "Wood", linked=False, max_res=2048),  # local victim
     ]
     report, plan = build_dedup_plan(items)
     assert plan[0]["canonical"] == "WoodLocal"
     assert plan[0]["linked_victims"] == ["WoodLib"]
-    assert any(f.category == "linked_victim" for f in report.findings)
+    assert report.category_details["duplicate_material"] == "2 (1 Local & 1 Linked)"
+    local = next(f for f in report.findings if f.message == "Local")
+    linked = next(f for f in report.findings if f.message.startswith("Linked"))
+    assert local.items == ["WoodLocal2"]
+    assert linked.items == ["WoodLib"]
+
+
+def test_build_plan_no_duplicates_reports_none():
+    items = [_m("A", "A"), {"id": "B", "name": "B", "linked": False, "max_res": 0,
+                            "fingerprint": "ZZZ"}]
+    items[0]["fingerprint"] = "AAA"
+    report, plan = build_dedup_plan(items)
+    assert plan == []
+    assert report.category_details["duplicate_material"] == "0 (0 Local & 0 Linked)"
+    assert any(f.message == "No duplicate materials found" for f in report.findings)
 
 
 def test_no_duplicates_empty_plan():

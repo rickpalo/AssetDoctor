@@ -72,50 +72,46 @@ def build_dedup_plan(items: list[dict], whitelist=(), blacklist=()):
     )
 
     plan = []
-    total_victims = 0
+    local_victims: list[str] = []   # duplicate materials that will be removed
+    linked_victims: list[str] = []  # duplicate materials that stay in their library
     for fp, ids in sorted(clusters.items(), key=lambda kv: sorted(kv[1])[0]):
         members = [by_id[i] for i in sorted(ids)]
         canonical, reason = choose_canonical(members, list(whitelist), list(blacklist))
         victims = [m for m in members if m["id"] != canonical["id"]]
-        linked_victims = [v["id"] for v in victims if v["linked"]]
-        total_victims += len(victims)
+        grp_linked = [v["id"] for v in victims if v["linked"]]
         plan.append({
             "fingerprint": fp,
             "canonical": canonical["id"],
             "victims": [v["id"] for v in victims],
-            "linked_victims": linked_victims,
+            "linked_victims": grp_linked,
         })
-        report.add(Finding(
-            category="duplicate_group",
-            message=(
-                f"{len(members)} identical materials → keep '{canonical['id']}' "
-                f"({reason}); remap {len(victims)}"
-            ),
-            severity="warning",
-            items=[canonical["id"]] + [v["id"] for v in victims],
-            data={
-                "canonical": canonical["id"],
-                "victims": [v["id"] for v in victims],
-                "reason": reason,
-                "linked_victims": linked_victims,
-            },
-        ))
-        if linked_victims:
-            report.add(Finding(
-                category="linked_victim",
-                message=(
-                    f"{len(linked_victims)} duplicate(s) are linked: local users will be "
-                    "remapped, but the linked datablock stays in its library — "
-                    + ", ".join(linked_victims)
-                ),
-                severity="info",
-                items=linked_victims,
-            ))
+        for v in victims:
+            (linked_victims if v["linked"] else local_victims).append(v["id"])
 
-    report.add(Finding(
-        category="summary",
-        message=f"{len(clusters)} duplicate group(s); {total_victims} material(s) can be remapped",
-        severity="info",
-        data={"groups": len(clusters), "victims": total_victims},
-    ))
+    local_victims.sort()
+    linked_victims.sort()
+    n_local, n_linked = len(local_victims), len(linked_victims)
+    total = n_local + n_linked
+
+    # Headline on the category row: "XX (YY Local & ZZ Linked)".
+    report.category_details["duplicate_material"] = (
+        f"{total} ({n_local} Local & {n_linked} Linked)"
+    )
+    if total == 0:
+        report.add(Finding(category="duplicate_material",
+                           message="No duplicate materials found", severity="info"))
+        return report, plan
+    if local_victims:
+        report.add(Finding(
+            category="duplicate_material", message="Local", severity="warning",
+            detail=str(n_local), items=local_victims,
+            data={"kind": "local", "count": n_local},
+        ))
+    if linked_victims:
+        report.add(Finding(
+            category="duplicate_material",
+            message="Linked (stay in their library; only local users are remapped)",
+            severity="info", detail=str(n_linked), items=linked_victims,
+            data={"kind": "linked", "count": n_linked},
+        ))
     return report, plan

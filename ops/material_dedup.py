@@ -118,8 +118,11 @@ class ASSETDOCTOR_OT_material_dedup(ModalProgressMixin, bpy.types.Operator):
         stash_report(context, report, "f3")
         for f in report.findings:
             log.info("F3 [%s] %s: %s", f.severity, f.category, f.message)
-        summary = next((f for f in report.findings if f.category == "summary"), None)
-        msg = summary.message if summary else "scan complete"
+        n_victims = sum(len(g["victims"]) for g in plan)
+        n_linked = sum(len(g["linked_victims"]) for g in plan)
+        msg = (f"{len(plan)} duplicate group(s); {n_victims} material(s) remappable "
+               f"({n_linked} linked stay in library)" if plan
+               else "No duplicate materials found")
 
         if not self.apply or not plan:
             level = "WARNING" if report.count("warning") else "INFO"

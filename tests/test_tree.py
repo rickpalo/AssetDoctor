@@ -83,6 +83,18 @@ def test_category_detail_is_finding_count():
     assert tree[1].detail == "1"  # one summary finding
 
 
+def test_category_detail_override_and_finding_detail():
+    r = Report(title="Materials", feature="F3")
+    r.category_details["duplicate_material"] = "3 (2 Local & 1 Linked)"
+    r.add(Finding("duplicate_material", "Local", severity="warning",
+                  detail="2", items=["Material/A", "Material/B"]))
+    r.add(Finding("duplicate_material", "Linked", severity="info",
+                  detail="1", items=["Material/C"]))
+    cat = report_to_tree(r)[0]
+    assert cat.detail == "3 (2 Local & 1 Linked)"   # override, not the finding count (2)
+    assert [(c.label, c.detail) for c in cat.children] == [("Local", "2"), ("Linked", "1")]
+
+
 def test_all_keys_covers_every_node():
     tree = report_to_tree(_report())
     keys = all_keys(tree)

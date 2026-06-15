@@ -18,6 +18,18 @@ def test_finding_defaults():
     assert f.severity == "info"
     assert f.items == []
     assert f.data == {}
+    assert f.detail == ""
+
+
+def test_finding_detail_and_category_details_roundtrip():
+    r = Report(title="Materials", feature="F3")
+    r.category_details["duplicate_material"] = "2 (1 Local & 1 Linked)"
+    r.add(Finding("duplicate_material", "Local", severity="warning",
+                  detail="1", items=["Material/A"]))
+    back = Report.from_json(r.to_json())
+    assert back.category_details == {"duplicate_material": "2 (1 Local & 1 Linked)"}
+    assert back.findings[0].detail == "1"
+    assert back.to_dict() == r.to_dict()
 
 
 def test_finding_rejects_bad_severity():

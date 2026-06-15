@@ -28,6 +28,8 @@ class Finding:
         severity: One of :data:`SEVERITIES`.
         items: Names/paths this finding concerns (the affected datablocks/files).
         data: Arbitrary extra structured payload for the UI / Apply step.
+        detail: Optional short right-aligned value shown on the finding's row
+            (e.g. a count); purely cosmetic.
     """
 
     category: str
@@ -35,6 +37,7 @@ class Finding:
     severity: str = "info"
     items: list[str] = field(default_factory=list)
     data: dict[str, Any] = field(default_factory=dict)
+    detail: str = ""
 
     def __post_init__(self) -> None:
         if self.severity not in SEVERITIES:
@@ -50,6 +53,9 @@ class Report:
     title: str
     feature: str  # "F1".."F4"
     findings: list[Finding] = field(default_factory=list)
+    # Optional per-category right-aligned detail string for the category header row
+    # (overrides the default finding-count). Keyed by Finding.category.
+    category_details: dict[str, str] = field(default_factory=dict)
 
     def add(self, finding: Finding) -> Finding:
         self.findings.append(finding)
@@ -76,11 +82,13 @@ class Report:
             "title": self.title,
             "feature": self.feature,
             "findings": [asdict(f) for f in self.findings],
+            "category_details": dict(self.category_details),
         }
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "Report":
         report = cls(title=d.get("title", ""), feature=d.get("feature", ""))
+        report.category_details = dict(d.get("category_details", {}))
         for f in d.get("findings", []):
             report.findings.append(
                 Finding(
@@ -89,6 +97,7 @@ class Report:
                     severity=f.get("severity", "info"),
                     items=list(f.get("items", [])),
                     data=dict(f.get("data", {})),
+                    detail=f.get("detail", ""),
                 )
             )
         return report
