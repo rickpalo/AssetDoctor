@@ -7,7 +7,7 @@
       "id": "assetdoctor",
       "name": "AssetDoctor",
       "tagline": "Map & clean linked assets, materials and orphan data",
-      "version": "0.1.7",
+      "version": "0.1.8",
       "type": "add-on",
       "maintainer": "rickpalo <rap2010@comcast.net>",
       "license": [
@@ -21,9 +21,9 @@
       "python_versions": [
         "3"
       ],
-      "archive_url": "./assetdoctor-0.1.7.zip",
-      "archive_size": 156396,
-      "archive_hash": "sha256:03c0425e94cb4daa495964f09613b4f17cc7a38d09e28113e7020b630e75ebd1"
+      "archive_url": "./assetdoctor-0.1.8.zip",
+      "archive_size": 159745,
+      "archive_hash": "sha256:ff9454bcb6381d1e37b90681a28411c32da7a2f45667b1469c68fbe558195a07"
     }
   ]
 }
