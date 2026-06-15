@@ -40,7 +40,9 @@ files = "Scan .blend files, write reports, and save backups before edits"
 paths_exclude_pattern = [
     "__pycache__/",
     "/.git/",
+    "/.pages/",
     "/dist/",
+    "/docs/",
     "/tests/",
     "/tools/",
     "/.pytest_cache/",

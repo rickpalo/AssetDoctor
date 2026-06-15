@@ -107,7 +107,7 @@ flagged as major.
 - 60 pytest tests pass. In Blender 5.1: a 1K+2K material pair clusters, the 2K wins canonical,
   Apply removes the 1K and repoints its object's slot to the 2K; whitelist override works.
 
-## [0.1.7] — unreleased
+## [0.1.7] — Make Local speed + collapsible panels
 
 ### Fixed
 - **Select-in-Outliner for all report findings.** Clicking a finding now selects the object(s)
